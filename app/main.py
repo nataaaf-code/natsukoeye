@@ -1,5 +1,6 @@
 import os
 import time
+import threading
 os.environ['TZ'] = 'Asia/Jakarta'
 if hasattr(time, 'tzset'):
     time.tzset()
@@ -673,23 +674,27 @@ def api_camera_night_mode():
 
 @app.route('/api/camera/siren', methods=['POST'])
 def api_camera_siren():
-    data = request.get_json() or {}
-    dev_id = request.args.get('device') or data.get('device')
-    ptz = get_ptz(dev_id)
-    state = data.get('state', 'active').lower()
-    duration = int(data.get('duration', 0))
+    try:
+        data = request.get_json() or {}
+        dev_id = request.args.get('device') or data.get('device')
+        ptz = get_ptz(dev_id)
+        state = data.get('state', 'active').lower()
+        duration = int(data.get('duration', 0))
 
-    ok, msg = ptz.set_relay(logical_state=state)
-    if ok and state == 'active' and duration > 0:
-        def auto_off():
-            time.sleep(duration)
-            try:
-                ptz.set_relay(logical_state='inactive')
-            except Exception:
-                pass
-        threading.Thread(target=auto_off, daemon=True).start()
+        ok, msg = ptz.set_relay(logical_state=state)
+        if ok and state == 'active' and duration > 0:
+            def auto_off():
+                time.sleep(duration)
+                try:
+                    ptz.set_relay(logical_state='inactive')
+                except Exception:
+                    pass
+            threading.Thread(target=auto_off, daemon=True).start()
 
-    return jsonify({"success": ok, "message": msg, "state": state})
+        return jsonify({"success": ok, "message": msg, "state": state})
+    except Exception as e:
+        app.logger.error(f"Error api_camera_siren: {e}")
+        return jsonify({"success": False, "message": str(e), "state": "error"}), 500
 
 @app.route('/api/camera/presets', methods=['GET', 'POST'])
 def api_camera_presets():

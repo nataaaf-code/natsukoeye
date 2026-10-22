@@ -2834,7 +2834,12 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ state: 'active', duration: durationSec })
         });
-        const json = await res.json();
+        let json = {};
+        try {
+          json = await res.json();
+        } catch (_) {
+          json = { success: res.ok, message: 'Status HTTP ' + res.status };
+        }
         if (json.success) {
           showToast('📢 Sirine / Relay hardware kamera aktif (' + durationSec + 's)', 'error');
           if (sirenTimeout) clearTimeout(sirenTimeout);
@@ -2842,11 +2847,11 @@
             stopSirenVisual();
           }, durationSec * 1000);
         } else {
-          showToast('Gagal memicu sirine: ' + json.message, 'error');
+          showToast('Gagal memicu sirine: ' + (json.message || 'Error server'), 'error');
           stopSirenVisual();
         }
       } catch (e) {
-        showToast('Error sirine: ' + e, 'error');
+        showToast('Error sirine: ' + (e.message || e), 'error');
         stopSirenVisual();
       }
     }
