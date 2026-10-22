@@ -1,15 +1,28 @@
-# NatsukoEye NVR Configuration
-storage_path: /recordings
-retention_days: 30
-max_upload_size_mb: 1000
+# NatsukoEye Configuration Example
+devices:
+  - id: bardi
+    name: Gang Sebelah Timur (2K Bardi)
+    type: rtsp
+    enabled: true
+    record: true
+    ip: 192.168.1.3
+    port: 554
+    username: admin
+    password: admin
+    rtsp_path: /V_ENC_000
+    onvif_port: 10000
+    segment_seconds: 3600
+    has_ptz: true
 
-camera:
-  enabled: true
-  name: "Gang Sebelah Timur"
-  ip: "192.168.1.3"
-  port: 554
-  username: "admin"
-  password: "admin_password"
-  rtsp_path: "/V_ENC_000"         # Main Stream 2K Super HD
-  custom_rtsp_url: ""
-  segment_seconds: 3600           # 1 Hour per segment (Clock-aligned)
+  - id: dishub_tangerang
+    name: Dishub Kab. Tangerang (Lalin)
+    type: hls
+    enabled: true
+    record: false
+    url: https://cctv-dishub.tangerangkab.go.id/storage/video/01jsr079n4btzjemf6r9br473w/01jsr079n4btzjemf6r9br473w.m3u8
+    segment_seconds: 3600
+    has_ptz: false
+
+max_upload_size_mb: 1000
+retention_days: 30
+storage_path: /recordings

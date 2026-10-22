@@ -28,11 +28,45 @@ def load_config():
     if not os.path.exists(CONFIG_PATH):
         return {}
     with open(CONFIG_PATH, 'r') as f:
-        return yaml.safe_load(f) or {}
+        cfg = yaml.safe_load(f) or {}
+
+    # Migrate single camera to devices list if needed
+    if 'devices' not in cfg:
+        cam = cfg.get('camera', {})
+        bardi_dev = {
+            'id': 'bardi',
+            'name': cam.get('name', 'Gang Tupan Timur (2K Bardi)'),
+            'type': 'rtsp',
+            'enabled': cam.get('enabled', True),
+            'record': True,
+            'ip': cam.get('ip', '192.168.1.3'),
+            'port': cam.get('port', 554),
+            'username': cam.get('username', 'admin'),
+            'password': cam.get('password', 'admin'),
+            'rtsp_path': cam.get('rtsp_path', '/V_ENC_000'),
+            'onvif_port': 10000,
+            'segment_seconds': cam.get('segment_seconds', 3600),
+            'has_ptz': True
+        }
+        cfg['devices'] = [bardi_dev]
+
+    return cfg
 
 def save_config(cfg):
     with open(CONFIG_PATH, 'w') as f:
         yaml.safe_dump(cfg, f, default_flow_style=False)
+
+def get_device_by_id(dev_id=None):
+    cfg = load_config()
+    devices = cfg.get('devices', [])
+    if not devices:
+        return cfg.get('camera', {})
+    if not dev_id:
+        return devices[0]
+    for d in devices:
+        if d.get('id') == dev_id:
+            return d
+    return devices[0]
 
 cfg = load_config()
 STORAGE_PATH = cfg.get('storage_path', '/recordings')
@@ -54,17 +88,24 @@ def human_size(nbytes):
         nbytes /= 1024
     return f"{nbytes:.1f} PB"
 
-def get_recordings():
+FILE_PATTERN = re.compile(r'^([a-zA-Z0-9_\-]+)_(\d{4}-\d{2}-\d{2})_(\d{2})-(\d{2})-(\d{2})\.mp4$')
+
+def get_recordings(device_id=None):
     recordings = []
     if not os.path.isdir(STORAGE_PATH):
         return recordings
     for name in sorted(os.listdir(STORAGE_PATH), reverse=True):
         fp = os.path.join(STORAGE_PATH, name)
         if os.path.isfile(fp) and (name.endswith('.mp4') or name.endswith('.mkv')):
+            m = FILE_PATTERN.match(name)
+            file_dev = m.group(1) if m else "bardi"
+            if device_id and device_id != 'all' and file_dev != device_id:
+                continue
             stat = os.stat(fp)
             if stat.st_size > 10000:
                 recordings.append({
                     'name': name,
+                    'device_id': file_dev,
                     'size': human_size(stat.st_size),
                     'size_bytes': stat.st_size,
                     'modified': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
@@ -83,28 +124,32 @@ def get_disk_usage():
 # ---------------------------------------------------------------------------
 # Timeline Indexer Engine (24-Hour NVR Timeline)
 # ---------------------------------------------------------------------------
-FILE_PATTERN = re.compile(r'bardi_(\d{4}-\d{2}-\d{2})_(\d{2})-(\d{2})-(\d{2})\.mp4')
-
-def get_playback_dates():
+def get_playback_dates(device_id=None):
     dates = set()
     if not os.path.isdir(STORAGE_PATH):
         return []
     for fname in os.listdir(STORAGE_PATH):
         m = FILE_PATTERN.match(fname)
         if m:
-            dates.add(m.group(1))
+            file_dev = m.group(1)
+            if device_id and device_id != 'all' and file_dev != device_id:
+                continue
+            dates.add(m.group(2))
     return sorted(list(dates), reverse=True)
 
-def get_playback_timeline(target_date):
+def get_playback_timeline(target_date, device_id=None):
     segments = []
     if not os.path.isdir(STORAGE_PATH):
-        return {"date": target_date, "segments": []}
+        return {"date": target_date, "device_id": device_id, "segments": []}
 
     files_for_date = []
     for fname in os.listdir(STORAGE_PATH):
         m = FILE_PATTERN.match(fname)
-        if m and m.group(1) == target_date:
-            hh, mm, ss = int(m.group(2)), int(m.group(3)), int(m.group(4))
+        if m and m.group(2) == target_date:
+            file_dev = m.group(1)
+            if device_id and device_id != 'all' and file_dev != device_id:
+                continue
+            hh, mm, ss = int(m.group(3)), int(m.group(4)), int(m.group(5))
             start_sec = hh * 3600 + mm * 60 + ss
             files_for_date.append((start_sec, fname, f"{hh:02d}:{mm:02d}:{ss:02d}"))
 
@@ -124,6 +169,7 @@ def get_playback_timeline(target_date):
 
         segments.append({
             "filename": fname,
+            "device_id": device_id,
             "start_time": time_str,
             "start_sec": sec,
             "end_sec": sec + duration,
@@ -134,6 +180,7 @@ def get_playback_timeline(target_date):
 
     return {
         "date": target_date,
+        "device_id": device_id,
         "total_segments": len(segments),
         "segments": segments
     }
@@ -166,12 +213,7 @@ scheduler.add_job(cleanup_old_recordings, 'cron', hour=2, minute=0, id='daily_cl
 
 def recorder_watchdog():
     try:
-        curr_cfg = load_config()
-        cam_cfg = curr_cfg.get('camera', {})
-        if cam_cfg.get('enabled', False):
-            if not recorder.is_alive():
-                app.logger.warning("Watchdog: Recorder thread is not alive! Reviving recorder...")
-                recorder.start()
+        recorder.sync_workers()
     except Exception as e:
         app.logger.error(f"Watchdog error: {e}")
 
@@ -184,20 +226,23 @@ scheduler.start()
 recorder = CameraRecorder(load_config)
 gdrive_sync = GDriveSync(storage_path=STORAGE_PATH)
 
-def get_ptz():
-    curr_cfg = load_config()
-    cam = curr_cfg.get('camera', {})
+def get_ptz(device_id=None):
+    dev = get_device_by_id(device_id)
+    if not dev.get('has_ptz', False):
+        cfg = load_config()
+        ptz_dev = next((d for d in cfg.get('devices', []) if d.get('has_ptz', False)), None)
+        if ptz_dev:
+            dev = ptz_dev
+
     return BardiPTZ(
-        ip=cam.get('ip', '192.168.1.3'),
-        port=10000,
-        user=cam.get('username', 'admin'),
-        password=cam.get('password', 'admin')
+        ip=dev.get('ip', '192.168.1.3'),
+        port=dev.get('onvif_port', 10000),
+        user=dev.get('username', 'admin'),
+        password=dev.get('password', 'admin')
     )
 
-# Start recorder automatically if camera is configured & enabled
-initial_cfg = load_config()
-if initial_cfg.get('camera', {}).get('enabled', False):
-    recorder.start()
+# Start multi-device recorder workers
+recorder.start()
 
 # ---------------------------------------------------------------------------
 # Web Routes
@@ -205,23 +250,29 @@ if initial_cfg.get('camera', {}).get('enabled', False):
 @app.route('/')
 def index():
     curr_cfg = load_config()
-    recordings = get_recordings()
+    devices = curr_cfg.get('devices', [])
+    active_id = request.args.get('device', devices[0]['id'] if devices else 'bardi')
+    active_dev = next((d for d in devices if d.get('id') == active_id), devices[0] if devices else {})
+
+    recordings = get_recordings(device_id=active_id)
     disk = get_disk_usage()
     total_size = sum(r['size_bytes'] for r in recordings)
-    cam_status = recorder.get_status()
-    cam_cfg = curr_cfg.get('camera', {})
-    playback_dates = get_playback_dates()
+    cam_status = recorder.get_status(active_id)
+    playback_dates = get_playback_dates(device_id=active_id)
     gdrive_status = gdrive_sync.get_status()
 
     return render_template(
         'index.html',
+        devices=devices,
+        active_dev=active_dev,
+        active_device_id=active_id,
         recordings=recordings,
         disk=disk,
         total_files=len(recordings),
         total_size=human_size(total_size),
         retention_days=curr_cfg.get('retention_days', 30),
         cam_status=cam_status,
-        cam_cfg=cam_cfg,
+        cam_cfg=active_dev,
         playback_dates=playback_dates,
         gdrive_status=gdrive_status,
     )
@@ -231,16 +282,18 @@ def index():
 # ---------------------------------------------------------------------------
 @app.route('/api/playback/dates')
 def api_playback_dates():
-    return jsonify(get_playback_dates())
+    dev_id = request.args.get('device')
+    return jsonify(get_playback_dates(device_id=dev_id))
 
 @app.route('/api/playback/timeline')
 def api_playback_timeline():
+    dev_id = request.args.get('device')
     target_date = request.args.get('date')
     if not target_date:
         today = datetime.now().strftime('%Y-%m-%d')
-        available = get_playback_dates()
+        available = get_playback_dates(device_id=dev_id)
         target_date = available[0] if available else today
-    return jsonify(get_playback_timeline(target_date))
+    return jsonify(get_playback_timeline(target_date, device_id=dev_id))
 
 @app.route('/api/gdrive/status')
 def api_gdrive_status():
@@ -252,33 +305,184 @@ def api_gdrive_sync():
     return jsonify({"success": ok, "message": msg})
 
 # ---------------------------------------------------------------------------
+# Device Management API
+# ---------------------------------------------------------------------------
+@app.route('/api/devices')
+def api_devices_list():
+    curr_cfg = load_config()
+    return jsonify(curr_cfg.get('devices', []))
+
+@app.route('/api/devices/save', methods=['POST'])
+def api_devices_save():
+    curr_cfg = load_config()
+    devices = curr_cfg.get('devices', [])
+    data = request.get_json() or {}
+    dev_id = data.get('id', '').strip()
+    if not dev_id:
+        dev_id = 'cam_' + str(int(time.time()))
+
+    dev = {
+        'id': dev_id,
+        'name': data.get('name', 'Kamera').strip() or 'Kamera',
+        'type': data.get('type', 'rtsp').strip().lower(),
+        'enabled': bool(data.get('enabled', True)),
+        'record': bool(data.get('record', False)),
+        'segment_seconds': int(data.get('segment_seconds', 3600) or 3600),
+        'has_ptz': bool(data.get('has_ptz', False)),
+    }
+
+    if dev['type'] == 'hls':
+        dev['url'] = data.get('url', '').strip()
+    else:
+        dev['ip'] = data.get('ip', '').strip()
+        dev['port'] = int(data.get('port', 554) or 554)
+        dev['username'] = data.get('username', 'admin').strip()
+        new_pw = data.get('password', '').strip()
+        if new_pw:
+            dev['password'] = new_pw
+        else:
+            existing = next((d for d in devices if d.get('id') == dev_id), None)
+            dev['password'] = existing.get('password', 'admin') if existing else 'admin'
+        dev['rtsp_path'] = data.get('rtsp_path', '/V_ENC_000').strip() or '/V_ENC_000'
+        dev['onvif_port'] = int(data.get('onvif_port', 10000) or 10000)
+
+    idx = next((i for i, d in enumerate(devices) if d.get('id') == dev_id), -1)
+    if idx >= 0:
+        devices[idx] = dev
+    else:
+        devices.append(dev)
+
+    curr_cfg['devices'] = devices
+    if devices:
+        curr_cfg['camera'] = devices[0]
+    save_config(curr_cfg)
+    recorder.sync_workers()
+
+    return jsonify({"success": True, "device": dev, "message": f'Perangkat "{dev["name"]}" berhasil disimpan.'})
+
+@app.route('/api/devices/delete', methods=['POST'])
+def api_devices_delete():
+    curr_cfg = load_config()
+    devices = curr_cfg.get('devices', [])
+    data = request.get_json() or {}
+    dev_id = data.get('id')
+    if not dev_id:
+        return jsonify({"success": False, "message": "ID perangkat tidak valid"}), 400
+    if len(devices) <= 1:
+        return jsonify({"success": False, "message": "Minimal harus ada 1 kamera terdaftar"}), 400
+
+    devices = [d for d in devices if d.get('id') != dev_id]
+    curr_cfg['devices'] = devices
+    if devices:
+        curr_cfg['camera'] = devices[0]
+    save_config(curr_cfg)
+    recorder.sync_workers()
+
+    return jsonify({"success": True, "message": "Kamera berhasil dihapus."})
+
+# ---------------------------------------------------------------------------
+# HLS Smart CORS Proxy
+# ---------------------------------------------------------------------------
+@app.route('/proxy/hls/<device_id>/playlist.m3u8')
+def proxy_hls_playlist(device_id):
+    dev = get_device_by_id(device_id)
+    if not dev or dev.get('type') != 'hls':
+        abort(404)
+    target_url = dev.get('url')
+    if not target_url:
+        abort(404)
+
+    req = urllib.request.Request(target_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as res:
+            raw = res.read().decode('utf-8', errors='replace')
+
+        lines = []
+        for line in raw.splitlines():
+            sline = line.strip()
+            if sline and not sline.startswith('#'):
+                lines.append(f'/proxy/hls/{device_id}/{sline}')
+            else:
+                lines.append(line)
+
+        body = '\n'.join(lines)
+        response = Response(body, mimetype='application/vnd.apple.mpegurl')
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return response
+    except Exception as e:
+        app.logger.error(f"HLS proxy error: {e}")
+        abort(502)
+
+@app.route('/proxy/hls/<device_id>/<path:segment>')
+def proxy_hls_segment(device_id, segment):
+    dev = get_device_by_id(device_id)
+    if not dev or dev.get('type') != 'hls':
+        abort(404)
+    base_url = dev.get('url').rsplit('/', 1)[0] + '/'
+    target_url = base_url + segment
+
+    req = urllib.request.Request(target_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+    try:
+        def stream_chunk():
+            with urllib.request.urlopen(req, timeout=6) as res:
+                while True:
+                    data = res.read(65536)
+                    if not data:
+                        break
+                    yield data
+        response = Response(stream_chunk(), mimetype='video/mp2t')
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response
+    except Exception as e:
+        app.logger.error(f"HLS segment error: {e}")
+        abort(502)
+
+# ---------------------------------------------------------------------------
 # Live View Streaming (MJPEG & Snapshots)
 # ---------------------------------------------------------------------------
 @app.route('/live/feed.mjpeg')
 def live_mjpeg():
-    """Real-time 2K live video preview from camera stream."""
-    curr_cfg = load_config()
-    cam_cfg = curr_cfg.get('camera', {})
-    ip = cam_cfg.get('ip', '192.168.1.3')
-    port = cam_cfg.get('port', 554)
-    user = cam_cfg.get('username', 'admin')
-    pwd = cam_cfg.get('password', 'admin')
-    stream_path = cam_cfg.get('rtsp_path', '/V_ENC_000') or '/V_ENC_000'
-    live_url = f"rtsp://{user}:{pwd}@{ip}:{port}{stream_path}"
+    """Real-time live video preview from active camera stream (RTSP or HLS)."""
+    dev_id = request.args.get('device')
+    dev = get_device_by_id(dev_id)
+    dev_type = dev.get('type', 'rtsp').lower()
 
-    def generate_frames():
+    if dev_type == 'hls':
+        stream_url = dev.get('url', '')
+        cmd = [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel", "error",
+            "-i", stream_url,
+            "-f", "mjpeg",
+            "-q:v", "4",
+            "-r", "15",
+            "-an",
+            "-"
+        ]
+    else:
+        ip = dev.get('ip', '192.168.1.3')
+        port = dev.get('port', 554)
+        user = dev.get('username', 'admin')
+        pwd = dev.get('password', 'admin')
+        stream_path = dev.get('rtsp_path', '/V_ENC_000') or '/V_ENC_000'
+        stream_url = f"rtsp://{user}:{pwd}@{ip}:{port}{stream_path}"
         cmd = [
             "ffmpeg",
             "-rtsp_transport", "tcp",
+            "-timeout", "5000000",
             "-hide_banner",
             "-loglevel", "error",
-            "-i", live_url,
+            "-i", stream_url,
             "-f", "mjpeg",
             "-q:v", "3",
             "-r", "15",
             "-an",
             "-"
         ]
+
+    def generate_frames():
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=10**6)
         buffer = b""
         try:
@@ -307,28 +511,42 @@ def live_mjpeg():
 
 @app.route('/live/snapshot.jpg')
 def live_snapshot():
-    """Capture a single 2K instantaneous frame."""
-    curr_cfg = load_config()
-    cam_cfg = curr_cfg.get('camera', {})
-    ip = cam_cfg.get('ip', '192.168.1.3')
-    port = cam_cfg.get('port', 554)
-    user = cam_cfg.get('username', 'admin')
-    pwd = cam_cfg.get('password', 'admin')
-    stream_path = cam_cfg.get('rtsp_path', '/V_ENC_000') or '/V_ENC_000'
-    live_url = f"rtsp://{user}:{pwd}@{ip}:{port}{stream_path}"
+    """Capture a single instantaneous frame."""
+    dev_id = request.args.get('device')
+    dev = get_device_by_id(dev_id)
+    dev_type = dev.get('type', 'rtsp').lower()
 
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-rtsp_transport", "tcp",
-        "-i", live_url,
-        "-vframes", "1",
-        "-q:v", "2",
-        "-f", "image2",
-        "-"
-    ]
+    if dev_type == 'hls':
+        stream_url = dev.get('url', '')
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i", stream_url,
+            "-vframes", "1",
+            "-q:v", "2",
+            "-f", "image2",
+            "-"
+        ]
+    else:
+        ip = dev.get('ip', '192.168.1.3')
+        port = dev.get('port', 554)
+        user = dev.get('username', 'admin')
+        pwd = dev.get('password', 'admin')
+        stream_path = dev.get('rtsp_path', '/V_ENC_000') or '/V_ENC_000'
+        stream_url = f"rtsp://{user}:{pwd}@{ip}:{port}{stream_path}"
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-rtsp_transport", "tcp",
+            "-i", stream_url,
+            "-vframes", "1",
+            "-q:v", "2",
+            "-f", "image2",
+            "-"
+        ]
+
     try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=4)
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=5)
         if res.returncode == 0:
             return Response(res.stdout, mimetype='image/jpeg')
         else:
@@ -341,15 +559,17 @@ def live_snapshot():
 # ---------------------------------------------------------------------------
 @app.route('/api/ptz/move', methods=['POST'])
 def api_ptz_move():
+    dev_id = request.args.get('device')
     direction = request.args.get('direction', 'stop').lower()
     speed = float(request.args.get('speed', 0.4))
-    ptz = get_ptz()
+    ptz = get_ptz(dev_id)
     ok, msg = ptz.move(direction=direction, speed=speed)
     return jsonify({"success": ok, "message": msg, "direction": direction})
 
 @app.route('/api/ptz/stop', methods=['POST'])
 def api_ptz_stop():
-    ptz = get_ptz()
+    dev_id = request.args.get('device')
+    ptz = get_ptz(dev_id)
     ok, msg = ptz.stop()
     return jsonify({"success": ok, "message": msg})
 
@@ -358,12 +578,13 @@ def api_ptz_stop():
 # ---------------------------------------------------------------------------
 @app.route('/api/camera/imaging', methods=['GET', 'POST'])
 def api_camera_imaging():
-    ptz = get_ptz()
+    data = request.get_json() if request.is_json else {}
+    dev_id = request.args.get('device') or data.get('device')
+    ptz = get_ptz(dev_id)
     if request.method == 'GET':
-        ok, data = ptz.get_imaging()
-        return jsonify({"success": ok, "data": data})
+        ok, res_data = ptz.get_imaging()
+        return jsonify({"success": ok, "data": res_data})
 
-    data = request.get_json() or {}
     ok, res = ptz.set_imaging(
         ircut=data.get('ircut'),
         brightness=data.get('brightness'),
@@ -375,16 +596,18 @@ def api_camera_imaging():
 
 @app.route('/api/camera/night-mode', methods=['POST'])
 def api_camera_night_mode():
-    ptz = get_ptz()
     data = request.get_json() or {}
+    dev_id = request.args.get('device') or data.get('device')
+    ptz = get_ptz(dev_id)
     mode = data.get('mode', 'AUTO').upper()
     ok, res = ptz.set_night_mode(mode)
     return jsonify({"success": ok, "mode": mode, "data": res if ok else None, "error": None if ok else str(res)})
 
 @app.route('/api/camera/siren', methods=['POST'])
 def api_camera_siren():
-    ptz = get_ptz()
     data = request.get_json() or {}
+    dev_id = request.args.get('device') or data.get('device')
+    ptz = get_ptz(dev_id)
     state = data.get('state', 'active').lower()
     duration = int(data.get('duration', 0))
 
@@ -402,12 +625,13 @@ def api_camera_siren():
 
 @app.route('/api/camera/presets', methods=['GET', 'POST'])
 def api_camera_presets():
-    ptz = get_ptz()
+    data = request.get_json() if request.is_json else {}
+    dev_id = request.args.get('device') or data.get('device')
+    ptz = get_ptz(dev_id)
     if request.method == 'GET':
         ok, presets = ptz.get_presets()
         return jsonify({"success": ok, "presets": presets})
 
-    data = request.get_json() or {}
     action = data.get('action', '').lower()
 
     if action == 'goto':
@@ -433,76 +657,106 @@ def api_camera_presets():
 
 @app.route('/api/camera/reboot', methods=['POST'])
 def api_camera_reboot():
-    ptz = get_ptz()
+    dev_id = request.args.get('device')
+    ptz = get_ptz(dev_id)
     ok, msg = ptz.reboot()
     return jsonify({"success": ok, "message": msg})
 
 # ---------------------------------------------------------------------------
 # Settings & Control
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Settings & Control
+# ---------------------------------------------------------------------------
 @app.route('/settings', methods=['POST'])
 def save_settings():
     curr_cfg = load_config()
-    cam = curr_cfg.get('camera', {})
+    devices = curr_cfg.get('devices', [])
+    dev_id = request.form.get('dev_id', '').strip()
+    if not dev_id:
+        dev_id = 'bardi'
 
-    cam['name'] = request.form.get('name', 'Gang Sebelah Timur').strip() or 'Gang Sebelah Timur'
-    cam['ip'] = request.form.get('ip', '192.168.1.3').strip()
-    cam['port'] = int(request.form.get('port', 554) or 554)
-    cam['username'] = request.form.get('username', 'admin').strip()
-    
-    new_pw = request.form.get('password', '').strip()
-    if new_pw:
-        cam['password'] = new_pw
+    dev_type = request.form.get('type', 'rtsp').strip().lower()
+    dev_name = request.form.get('name', '').strip() or ('Bardi PTZ' if dev_type == 'rtsp' else 'Public CCTV')
+    should_record = request.form.get('record') == 'on' or request.form.get('record') == 'true' or request.form.get('record') == '1'
 
-    cam['rtsp_path'] = request.form.get('rtsp_path', '/V_ENC_000').strip()
-    cam['custom_rtsp_url'] = request.form.get('custom_rtsp_url', '').strip()
-    cam['segment_seconds'] = int(request.form.get('segment_seconds', 3600) or 3600)
-    
-    # Guaranteed 24/7 Autonomous Auto-Record: ALWAYS enabled upon saving device
-    cam['enabled'] = True
+    # Build device dict
+    dev = {
+        'id': dev_id,
+        'name': dev_name,
+        'type': dev_type,
+        'enabled': True,
+        'record': should_record,
+        'segment_seconds': int(request.form.get('segment_seconds', 3600) or 3600),
+        'has_ptz': dev_type == 'rtsp',
+    }
 
-    ret_days = int(request.form.get('retention_days', 30) or 30)
-    curr_cfg['retention_days'] = ret_days
-    curr_cfg['camera'] = cam
+    if dev_type == 'hls':
+        dev['url'] = request.form.get('url', '').strip()
+    else:
+        dev['ip'] = request.form.get('ip', '192.168.1.3').strip()
+        dev['port'] = int(request.form.get('port', 554) or 554)
+        dev['username'] = request.form.get('username', 'admin').strip()
+        new_pw = request.form.get('password', '').strip()
+        if new_pw:
+            dev['password'] = new_pw
+        else:
+            existing = next((d for d in devices if d.get('id') == dev_id), None)
+            dev['password'] = existing.get('password', 'admin') if existing else 'admin'
+        dev['rtsp_path'] = request.form.get('rtsp_path', '/V_ENC_000').strip() or '/V_ENC_000'
+        dev['onvif_port'] = int(request.form.get('onvif_port', 10000) or 10000)
+
+    # Save to devices
+    idx = next((i for i, d in enumerate(devices) if d.get('id') == dev_id), -1)
+    if idx >= 0:
+        devices[idx] = dev
+    else:
+        devices.append(dev)
+
+    curr_cfg['devices'] = devices
+    if devices:
+        curr_cfg['camera'] = devices[0]
+    curr_cfg['retention_days'] = int(request.form.get('retention_days', 30) or 30)
     save_config(curr_cfg)
 
-    # Immediately ensure recorder is running 24/7
-    recorder.restart()
-    flash(f'Pengaturan kamera "{cam["name"]}" berhasil disimpan. Perekam 24/7 aktif & merekam!', 'success')
+    # Sync autonomous recording workers
+    recorder.sync_workers()
+    rec_text = "Merekam 24/7 Aktif" if should_record else "Live View Saja (Tidak Rekam)"
+    flash(f'Pengaturan kamera "{dev["name"]}" disimpan. Status: {rec_text}.', 'success')
 
-    return redirect(url_for('index'))
+    return redirect(url_for('index', device=dev_id))
 
 @app.route('/recorder/start', methods=['POST'])
 def recorder_start():
-    curr_cfg = load_config()
-    curr_cfg.setdefault('camera', {})['enabled'] = True
-    save_config(curr_cfg)
     recorder.start()
-    flash('Perekaman otomatis 24/7 dijalankan.', 'success')
+    flash('Perekaman otomatis multi-kamera disinkronkan & dijalankan.', 'success')
     return redirect(url_for('index'))
 
 @app.route('/recorder/stop', methods=['POST'])
 def recorder_stop():
-    curr_cfg = load_config()
-    curr_cfg.setdefault('camera', {})['enabled'] = False
-    save_config(curr_cfg)
     recorder.stop()
-    flash('Perekaman dihentikan.', 'info')
+    flash('Semua proses perekaman dihentikan.', 'info')
     return redirect(url_for('index'))
 
 @app.route('/recorder/test', methods=['POST'])
 def recorder_test():
     curr_cfg = load_config()
-    cam = dict(curr_cfg.get('camera', {}))
-    if request.is_json:
-        data = request.get_json()
+    data = request.get_json() if request.is_json else {}
+    dev_id = data.get('id') or request.args.get('device')
+    if dev_id:
+        dev = next((d for d in curr_cfg.get('devices', []) if d.get('id') == dev_id), None)
+        cam = dict(dev) if dev else data
+        cam.update(data)
+    else:
+        cam = dict(curr_cfg.get('devices', [{}])[0])
         cam.update(data)
     ok, msg = recorder.test_connection(cam)
     return jsonify({"success": ok, "message": msg})
 
 @app.route('/recorder/status')
 def recorder_status_api():
-    return jsonify(recorder.get_status())
+    dev_id = request.args.get('device')
+    return jsonify(recorder.get_status(dev_id))
 
 # ---------------------------------------------------------------------------
 # Universal In-Browser Video Playback (H.264 On-The-Fly Web Streamer)
