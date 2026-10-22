@@ -354,6 +354,90 @@ def api_ptz_stop():
     return jsonify({"success": ok, "message": msg})
 
 # ---------------------------------------------------------------------------
+# ONVIF Camera Control (Night Mode, Imaging, Siren/Relay, Presets, Reboot)
+# ---------------------------------------------------------------------------
+@app.route('/api/camera/imaging', methods=['GET', 'POST'])
+def api_camera_imaging():
+    ptz = get_ptz()
+    if request.method == 'GET':
+        ok, data = ptz.get_imaging()
+        return jsonify({"success": ok, "data": data})
+
+    data = request.get_json() or {}
+    ok, res = ptz.set_imaging(
+        ircut=data.get('ircut'),
+        brightness=data.get('brightness'),
+        contrast=data.get('contrast'),
+        saturation=data.get('saturation'),
+        sharpness=data.get('sharpness')
+    )
+    return jsonify({"success": ok, "data": res if ok else None, "message": "Citra kamera diperbarui" if ok else str(res)})
+
+@app.route('/api/camera/night-mode', methods=['POST'])
+def api_camera_night_mode():
+    ptz = get_ptz()
+    data = request.get_json() or {}
+    mode = data.get('mode', 'AUTO').upper()
+    ok, res = ptz.set_night_mode(mode)
+    return jsonify({"success": ok, "mode": mode, "data": res if ok else None, "error": None if ok else str(res)})
+
+@app.route('/api/camera/siren', methods=['POST'])
+def api_camera_siren():
+    ptz = get_ptz()
+    data = request.get_json() or {}
+    state = data.get('state', 'active').lower()
+    duration = int(data.get('duration', 0))
+
+    ok, msg = ptz.set_relay(logical_state=state)
+    if ok and state == 'active' and duration > 0:
+        def auto_off():
+            time.sleep(duration)
+            try:
+                ptz.set_relay(logical_state='inactive')
+            except Exception:
+                pass
+        threading.Thread(target=auto_off, daemon=True).start()
+
+    return jsonify({"success": ok, "message": msg, "state": state})
+
+@app.route('/api/camera/presets', methods=['GET', 'POST'])
+def api_camera_presets():
+    ptz = get_ptz()
+    if request.method == 'GET':
+        ok, presets = ptz.get_presets()
+        return jsonify({"success": ok, "presets": presets})
+
+    data = request.get_json() or {}
+    action = data.get('action', '').lower()
+
+    if action == 'goto':
+        token = data.get('token')
+        if not token:
+            return jsonify({"success": False, "message": "Token preset tidak valid"}), 400
+        ok, msg = ptz.goto_preset(token)
+        return jsonify({"success": ok, "message": msg})
+
+    elif action == 'set':
+        name = data.get('name', 'Sudut Pantau')
+        ok, res = ptz.set_preset(name)
+        return jsonify({"success": ok, "preset": res if ok else None, "message": "Preset berhasil disimpan" if ok else str(res)})
+
+    elif action == 'remove':
+        token = data.get('token')
+        if not token:
+            return jsonify({"success": False, "message": "Token preset tidak valid"}), 400
+        ok, msg = ptz.remove_preset(token)
+        return jsonify({"success": ok, "message": msg})
+
+    return jsonify({"success": False, "message": "Aksi tidak dikenali"}), 400
+
+@app.route('/api/camera/reboot', methods=['POST'])
+def api_camera_reboot():
+    ptz = get_ptz()
+    ok, msg = ptz.reboot()
+    return jsonify({"success": ok, "message": msg})
+
+# ---------------------------------------------------------------------------
 # Settings & Control
 # ---------------------------------------------------------------------------
 @app.route('/settings', methods=['POST'])

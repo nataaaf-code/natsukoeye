@@ -450,6 +450,227 @@
       gap: 0.5rem;
     }
 
+    /* Retro Bardi Hardware Control Deck */
+    .bardi-deck-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.75rem;
+    }
+    @media (max-width: 640px) {
+      .bardi-deck-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.6rem;
+      }
+    }
+    .bardi-unit {
+      background: #ffffff;
+      border: 1.5px solid #000000;
+      border-radius: 4px;
+      padding: 0.65rem 0.75rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 1.5px 1.5px 0px #000000;
+    }
+    .unit-label {
+      font-size: 0.68rem;
+      font-weight: 800;
+      font-family: 'JetBrains Mono', monospace;
+      text-transform: uppercase;
+      color: #000000;
+      margin-bottom: 0.4rem;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .unit-status {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+      margin-top: 0.35rem;
+    }
+
+    /* Night Mode Segmented Pill */
+    .night-mode-pill {
+      display: flex;
+      border: 2px solid #000000;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #ffffff;
+      box-shadow: 1.5px 1.5px 0px #000000;
+    }
+    .nm-btn {
+      flex: 1;
+      padding: 0.45rem 0.2rem;
+      border: none;
+      background: #ffffff;
+      color: #000000;
+      font-size: 0.68rem;
+      font-weight: 800;
+      cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+      text-align: center;
+      transition: all 0.1s ease;
+      border-right: 1.5px solid #000000;
+    }
+    .nm-btn:last-child {
+      border-right: none;
+    }
+    .nm-btn:hover {
+      background: var(--accent-yellow);
+    }
+    .nm-btn.active {
+      background: #000000;
+      color: #ffffff;
+    }
+
+    /* Hazard button for siren */
+    .btn-hazard {
+      background: repeating-linear-gradient(
+        45deg,
+        #facc15,
+        #facc15 10px,
+        #000000 10px,
+        #000000 20px
+      ) !important;
+      color: #ffffff !important;
+      font-weight: 900 !important;
+      text-shadow: 1px 1px 0px #000000;
+      box-shadow: 2px 2px 0px #000000 !important;
+      border: 2px solid #000000 !important;
+      width: 100%;
+      padding: 0.55rem 0.5rem !important;
+      font-size: 0.72rem !important;
+      cursor: pointer;
+    }
+    .btn-hazard:hover {
+      filter: brightness(1.1);
+      transform: translate(-1px, -1px);
+      box-shadow: 3px 3px 0px #000000 !important;
+    }
+    .btn-hazard:active {
+      transform: translate(1px, 1px);
+      box-shadow: 0px 0px 0px #000000 !important;
+    }
+    .btn-hazard.pulsing {
+      animation: sirenPulse 0.5s infinite alternate;
+    }
+    @keyframes sirenPulse {
+      from { filter: invert(0); }
+      to { filter: invert(1); }
+    }
+
+    /* Preset Chips */
+    .preset-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      min-height: 32px;
+      align-items: center;
+    }
+    .preset-chip {
+      display: inline-flex;
+      align-items: center;
+      background: #ffffff;
+      border: 1.5px solid #000000;
+      box-shadow: 1.5px 1.5px 0px #000000;
+      border-radius: 4px;
+      overflow: hidden;
+      font-size: 0.72rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .preset-chip-btn {
+      padding: 0.35rem 0.6rem;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-weight: 700;
+      color: #000000;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    .preset-chip-btn:hover {
+      background: var(--accent-yellow);
+    }
+    .preset-chip-del {
+      padding: 0.35rem 0.45rem;
+      border: none;
+      border-left: 1px solid #000000;
+      background: transparent;
+      cursor: pointer;
+      color: var(--accent-red);
+      font-weight: 900;
+      font-size: 0.72rem;
+    }
+    .preset-chip-del:hover {
+      background: var(--accent-red);
+      color: #ffffff;
+    }
+
+    /* Retro Sliders */
+    .retro-slider {
+      width: 100%;
+      height: 10px;
+      background: #e5e7eb;
+      border: 2px solid #000000;
+      border-radius: 4px;
+      outline: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+      margin-top: 0.4rem;
+      box-shadow: 1.5px 1.5px 0px #000000;
+    }
+    .retro-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      background: #000000;
+      border: 2px solid #ffffff;
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: 1px 1px 0px #000000;
+    }
+    .retro-slider::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      background: #000000;
+      border: 2px solid #ffffff;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    /* Toast Notification Container */
+    #retroToastContainer {
+      position: fixed;
+      top: 1.25rem;
+      right: 1.25rem;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      pointer-events: none;
+    }
+    .retro-toast {
+      pointer-events: auto;
+      padding: 0.65rem 1rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border: 2px solid #000000;
+      box-shadow: 3px 3px 0px #000000;
+      background: #ffffff;
+      color: #000000;
+      animation: toastSlideIn 0.2s ease-out;
+    }
+    @keyframes toastSlideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
     /* Stats Stack */
     .stats-stack {
       display: flex;
@@ -1343,6 +1564,76 @@
             </div>
           </div>
         </div>
+
+        <!-- Bardi Hardware Control Deck (Night Mode, Siren, Citra 2K, Presets) -->
+        <div class="bardi-deck" style="margin-top: 1rem; padding: 1.15rem; background: #fafafa; border: 2px solid #000000; box-shadow: 2px 2px 0px #000000; border-radius: 6px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.85rem; padding-bottom:0.5rem; border-bottom:1.5px dashed #000000;">
+            <div style="display:flex; align-items:center; gap:0.4rem; font-weight:800; font-size:0.82rem; text-transform:uppercase; letter-spacing:0.5px;">
+              <span>⚙️</span> FITUR HARDWARE BARDI PTZ
+            </div>
+            <div style="font-size:0.68rem; font-family:'JetBrains Mono',monospace; background:#000000; color:#ffffff; padding:2px 7px; border-radius:3px; font-weight:700;">
+              ONVIF DIRECT
+            </div>
+          </div>
+
+          <div class="bardi-deck-grid">
+            <!-- 1. Night Mode IR Cut Segmented Pill -->
+            <div class="bardi-unit">
+              <div class="unit-label">🌙 MODE MALAM (IR CUT)</div>
+              <div class="night-mode-pill">
+                <button type="button" class="nm-btn" id="btnNmAuto" onclick="setNightMode('AUTO')" title="Otomatis ganti sensor siang/malam">AUTO</button>
+                <button type="button" class="nm-btn" id="btnNmOff" onclick="setNightMode('OFF')" title="Mode Siang / Warna Aktif">☀️ SIANG</button>
+                <button type="button" class="nm-btn" id="btnNmOn" onclick="setNightMode('ON')" title="Mode Malam / IR Hitam-Putih">🌙 MALAM</button>
+              </div>
+              <div class="unit-status" id="lblNightMode">Memuat status IR...</div>
+            </div>
+
+            <!-- 2. Emergency Siren Trigger -->
+            <div class="bardi-unit">
+              <div class="unit-label">🚨 SIRINE / RELAY DARURAT</div>
+              <div style="display:flex; gap:0.4rem; width:100%;">
+                <button type="button" class="btn btn-hazard" id="btnSirenTrigger" onclick="triggerSiren(5)" style="flex:1;">
+                  📢 SIRINE 5 DETIK
+                </button>
+                <button type="button" class="btn" id="btnSirenStop" onclick="stopSiren()" style="display:none; background:#ff4444; color:#ffffff; border-color:#000000; font-weight:800; font-size:0.72rem; padding:0.55rem 0.6rem;">
+                  ⏹️ STOP
+                </button>
+              </div>
+              <div class="unit-status" id="lblSirenStatus">Relay hardware siap</div>
+            </div>
+
+            <!-- 3. Image Tuning Button -->
+            <div class="bardi-unit">
+              <div class="unit-label">🎨 CITRA & SENSOR 2K</div>
+              <button type="button" class="btn" onclick="openImageModal()" style="width:100%; font-size:0.75rem; padding:0.55rem 0.5rem;">
+                🎛️ ATUR CITRA SENSOR...
+              </button>
+              <div class="unit-status" id="lblImageSummary">Kecerahan: 50 · Kontras: 50</div>
+            </div>
+
+            <!-- 4. System Reboot -->
+            <div class="bardi-unit">
+              <div class="unit-label">⚡ SISTEM KAMERA</div>
+              <button type="button" class="btn" onclick="promptRebootCamera()" style="width:100%; font-size:0.75rem; padding:0.55rem 0.5rem;">
+                🔄 REBOOT KAMERA
+              </button>
+              <div class="unit-status">Restart chip internal Bardi</div>
+            </div>
+          </div>
+
+          <!-- 5. Presets (Sudut Pantau Favorit) -->
+          <div style="margin-top:0.9rem; padding-top:0.75rem; border-top:1.5px dashed #000000;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap; gap:0.4rem;">
+              <div class="unit-label" style="margin-bottom:0;">🎯 SUDUT PANTAU CEPAT (PTZ PRESETS)</div>
+              <button type="button" class="btn btn-accent" onclick="promptSavePreset()" style="font-size:0.7rem; padding:3px 8px; font-weight:800;">
+                + SIMPAN SUDUT SEKARANG
+              </button>
+            </div>
+            <div class="preset-chips" id="presetChipsContainer">
+              <span style="font-size:0.72rem; color:var(--text-muted); font-style:italic;">Memuat daftar sudut pantau...</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Stats Stack -->
@@ -1714,6 +2005,71 @@
     </div>
   </div>
 
+  <!-- Image Tuning Retro Modal -->
+  <div class="modal-backdrop" id="imageModal">
+    <div class="modal-box" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3>🎨 CITRA & SENSOR 2K BARDI</h3>
+        <button class="close-btn" onclick="closeImageModal()">&times;</button>
+      </div>
+
+      <div style="font-size:0.75rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace; margin-bottom:1.25rem;">
+        Konfigurasi langsung sensor DSP kamera Bardi via ONVIF Image Service (Rentang 0 - 100).
+      </div>
+
+      <!-- Brightness Slider -->
+      <div class="form-group">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label for="imgBrightness">☀️ BRIGHTNESS (KECERAHAN)</label>
+          <span class="tech-tag" id="valBrightness" style="background:var(--accent-yellow);">50</span>
+        </div>
+        <input type="range" class="retro-slider" id="imgBrightness" min="0" max="100" value="50" oninput="updateVal('valBrightness', this.value)">
+      </div>
+
+      <!-- Contrast Slider -->
+      <div class="form-group">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label for="imgContrast">🌓 CONTRAST (KONTRAS)</label>
+          <span class="tech-tag" id="valContrast" style="background:#e5e7eb;">50</span>
+        </div>
+        <input type="range" class="retro-slider" id="imgContrast" min="0" max="100" value="50" oninput="updateVal('valContrast', this.value)">
+      </div>
+
+      <!-- Color Saturation Slider -->
+      <div class="form-group">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label for="imgSaturation">🎨 COLOR SATURATION (WARNA)</label>
+          <span class="tech-tag" id="valSaturation" style="background:var(--accent-green);">50</span>
+        </div>
+        <input type="range" class="retro-slider" id="imgSaturation" min="0" max="100" value="50" oninput="updateVal('valSaturation', this.value)">
+      </div>
+
+      <!-- Sharpness Slider -->
+      <div class="form-group">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label for="imgSharpness">🔍 SHARPNESS (KETAJAMAN)</label>
+          <span class="tech-tag" id="valSharpness" style="background:var(--accent-yellow);">50</span>
+        </div>
+        <input type="range" class="retro-slider" id="imgSharpness" min="0" max="100" value="50" oninput="updateVal('valSharpness', this.value)">
+      </div>
+
+      <div style="display:flex; justify-content:space-between; gap:0.5rem; margin-top:1.5rem; border-top:2px solid #000000; padding-top:1rem; flex-wrap:wrap;">
+        <button type="button" class="btn" onclick="resetImageDefaults()" style="font-size:0.75rem;">
+          ↺ RESET 50
+        </button>
+        <div style="display:flex; gap:0.5rem;">
+          <button type="button" class="btn" onclick="closeImageModal()">BATAL</button>
+          <button type="button" class="btn btn-accent" id="btnSaveImage" onclick="saveImageTuning()">
+            💾 TERAPKAN KE KAMERA
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="retroToastContainer"></div>
+
   <footer>
     NATSUKOEYE &middot; AUTONOMOUS RETRO NVR SENTINEL &middot; cctv.natsuko.ai.id
   </footer>
@@ -1772,6 +2128,334 @@
     }
     function closeSettingsModal() {
       document.getElementById('settingsModal').style.display = 'none';
+    }
+
+    // =========================================================================
+    // RETRO TOAST NOTIFICATIONS
+    // =========================================================================
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('retroToastContainer');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = 'retro-toast flash-' + type;
+      toast.innerText = msg;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // =========================================================================
+    // BARDI HARDWARE FEATURES (NIGHT MODE, SIREN, CITRA, PRESETS, REBOOT)
+    // =========================================================================
+    let cachedPresets = [];
+
+    function updateVal(elemId, val) {
+      const el = document.getElementById(elemId);
+      if (el) el.innerText = val;
+    }
+
+    async function loadCameraHardwareStatus() {
+      try {
+        const res = await fetch('/api/camera/imaging');
+        const json = await res.json();
+        if (json.success && json.data) {
+          const d = json.data;
+          // Night mode button highlight
+          const ircut = (d.ircut || 'AUTO').toUpperCase();
+          const btnAuto = document.getElementById('btnNmAuto');
+          const btnOff = document.getElementById('btnNmOff');
+          const btnOn = document.getElementById('btnNmOn');
+          if (btnAuto) btnAuto.classList.toggle('active', ircut === 'AUTO');
+          if (btnOff) btnOff.classList.toggle('active', ircut === 'OFF');
+          if (btnOn) btnOn.classList.toggle('active', ircut === 'ON');
+          
+          const lbl = document.getElementById('lblNightMode');
+          if (lbl) {
+            lbl.innerText = ircut === 'AUTO' ? 'Aktif: AUTO (Otomatis)' : (ircut === 'ON' ? 'Aktif: IR Malam (Hitam-Putih)' : 'Aktif: Siang (Warna)');
+          }
+
+          // Slider values
+          if (document.getElementById('imgBrightness')) {
+            document.getElementById('imgBrightness').value = d.brightness;
+            updateVal('valBrightness', d.brightness);
+          }
+          if (document.getElementById('imgContrast')) {
+            document.getElementById('imgContrast').value = d.contrast;
+            updateVal('valContrast', d.contrast);
+          }
+          if (document.getElementById('imgSaturation')) {
+            document.getElementById('imgSaturation').value = d.saturation;
+            updateVal('valSaturation', d.saturation);
+          }
+          if (document.getElementById('imgSharpness')) {
+            document.getElementById('imgSharpness').value = d.sharpness;
+            updateVal('valSharpness', d.sharpness);
+          }
+          const sum = document.getElementById('lblImageSummary');
+          if (sum) {
+            sum.innerText = `Cerah: ${d.brightness} · Kontras: ${d.contrast} · Tajam: ${d.sharpness}`;
+          }
+        }
+      } catch (e) {
+        console.error('Failed loading imaging status', e);
+      }
+      loadPresets();
+    }
+
+    async function setNightMode(mode) {
+      const btnAuto = document.getElementById('btnNmAuto');
+      const btnOff = document.getElementById('btnNmOff');
+      const btnOn = document.getElementById('btnNmOn');
+      if (btnAuto) btnAuto.classList.toggle('active', mode === 'AUTO');
+      if (btnOff) btnOff.classList.toggle('active', mode === 'OFF');
+      if (btnOn) btnOn.classList.toggle('active', mode === 'ON');
+      const lbl = document.getElementById('lblNightMode');
+      if (lbl) lbl.innerText = 'Menerapkan mode ' + mode + '...';
+
+      try {
+        const res = await fetch('/api/camera/night-mode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: mode })
+        });
+        const json = await res.json();
+        if (json.success) {
+          showToast('🌙 Mode malam diubah ke: ' + mode, 'success');
+          loadCameraHardwareStatus();
+        } else {
+          showToast('Gagal mengubah mode malam: ' + (json.error || 'Error'), 'error');
+        }
+      } catch (e) {
+        showToast('Error request: ' + e, 'error');
+      }
+    }
+
+    let sirenTimeout = null;
+    async function triggerSiren(durationSec = 5) {
+      const btn = document.getElementById('btnSirenTrigger');
+      const btnStop = document.getElementById('btnSirenStop');
+      const lbl = document.getElementById('lblSirenStatus');
+
+      if (btn) {
+        btn.classList.add('pulsing');
+        btn.innerText = '🚨 MEMBUNYIKAN SIRINE...';
+      }
+      if (btnStop) btnStop.style.display = 'block';
+      if (lbl) lbl.innerText = 'Status: RELAY AKTIF (Bunyi)';
+
+      try {
+        const res = await fetch('/api/camera/siren', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: 'active', duration: durationSec })
+        });
+        const json = await res.json();
+        if (json.success) {
+          showToast('📢 Sirine / Relay hardware kamera aktif (' + durationSec + 's)', 'error');
+          if (sirenTimeout) clearTimeout(sirenTimeout);
+          sirenTimeout = setTimeout(() => {
+            stopSirenVisual();
+          }, durationSec * 1000);
+        } else {
+          showToast('Gagal memicu sirine: ' + json.message, 'error');
+          stopSirenVisual();
+        }
+      } catch (e) {
+        showToast('Error sirine: ' + e, 'error');
+        stopSirenVisual();
+      }
+    }
+
+    async function stopSiren() {
+      if (sirenTimeout) clearTimeout(sirenTimeout);
+      try {
+        await fetch('/api/camera/siren', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: 'inactive' })
+        });
+        showToast('Relay sirine dinonaktifkan.', 'info');
+      } catch (e) {
+        console.error('Stop siren failed', e);
+      }
+      stopSirenVisual();
+    }
+
+    function stopSirenVisual() {
+      const btn = document.getElementById('btnSirenTrigger');
+      const btnStop = document.getElementById('btnSirenStop');
+      const lbl = document.getElementById('lblSirenStatus');
+      if (btn) {
+        btn.classList.remove('pulsing');
+        btn.innerText = '📢 SIRINE 5 DETIK';
+      }
+      if (btnStop) btnStop.style.display = 'none';
+      if (lbl) lbl.innerText = 'Relay hardware siap';
+    }
+
+    function openImageModal() {
+      document.getElementById('imageModal').style.display = 'flex';
+    }
+    function closeImageModal() {
+      document.getElementById('imageModal').style.display = 'none';
+    }
+
+    function resetImageDefaults() {
+      ['imgBrightness', 'imgContrast', 'imgSaturation', 'imgSharpness'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = 50;
+      });
+      updateVal('valBrightness', 50);
+      updateVal('valContrast', 50);
+      updateVal('valSaturation', 50);
+      updateVal('valSharpness', 50);
+    }
+
+    async function saveImageTuning() {
+      const btn = document.getElementById('btnSaveImage');
+      const orig = btn.innerText;
+      btn.innerText = 'MENYIMPAN...';
+      btn.disabled = true;
+
+      const payload = {
+        brightness: parseInt(document.getElementById('imgBrightness').value),
+        contrast: parseInt(document.getElementById('imgContrast').value),
+        saturation: parseInt(document.getElementById('imgSaturation').value),
+        sharpness: parseInt(document.getElementById('imgSharpness').value)
+      };
+
+      try {
+        const res = await fetch('/api/camera/imaging', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (json.success) {
+          showToast('✅ Pengaturan citra sensor 2K berhasil diterapkan!', 'success');
+          closeImageModal();
+          loadCameraHardwareStatus();
+        } else {
+          showToast('❌ Gagal menerapkan: ' + json.message, 'error');
+        }
+      } catch (e) {
+        showToast('Error: ' + e, 'error');
+      } finally {
+        btn.innerText = orig;
+        btn.disabled = false;
+      }
+    }
+
+    async function loadPresets() {
+      const container = document.getElementById('presetChipsContainer');
+      if (!container) return;
+      try {
+        const res = await fetch('/api/camera/presets');
+        const json = await res.json();
+        if (json.success) {
+          cachedPresets = json.presets || [];
+          if (cachedPresets.length === 0) {
+            container.innerHTML = '<span style="font-size:0.72rem; color:var(--text-muted); font-style:italic;">Belum ada sudut tersimpan. Gerakkan kamera lalu klik "+ Simpan Sudut Sekarang".</span>';
+            return;
+          }
+          container.innerHTML = cachedPresets.map(p => `
+            <div class="preset-chip">
+              <button type="button" class="preset-chip-btn" onclick="gotoPreset('${p.token}', '${escapeHtml(p.name)}')" title="Putar kamera ke posisi ini">
+                🎯 ${escapeHtml(p.name)}
+              </button>
+              <button type="button" class="preset-chip-del" onclick="removePreset('${p.token}', '${escapeHtml(p.name)}')" title="Hapus sudut pantau ini">&times;</button>
+            </div>
+          `).join('');
+        }
+      } catch (e) {
+        console.error('Failed loading presets', e);
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    async function gotoPreset(token, name) {
+      showToast('🎯 Kamera bergerak ke sudut: ' + name + '...', 'info');
+      try {
+        const res = await fetch('/api/camera/presets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'goto', token: token })
+        });
+        const json = await res.json();
+        if (!json.success) {
+          showToast('Gagal memutar ke sudut: ' + json.message, 'error');
+        }
+      } catch (e) {
+        showToast('Error preset: ' + e, 'error');
+      }
+    }
+
+    async function promptSavePreset() {
+      const defaultName = 'Posisi ' + (cachedPresets.length + 1);
+      const name = prompt('Simpan posisi kamera saat ini sebagai preset sudut pantau:\nMasukkan nama sudut (misal: "Pintu Depan", "Jalan Timur"):', defaultName);
+      if (!name || !name.trim()) return;
+
+      try {
+        const res = await fetch('/api/camera/presets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'set', name: name.trim() })
+        });
+        const json = await res.json();
+        if (json.success) {
+          showToast('✅ Sudut pantau "' + name.trim() + '" berhasil disimpan!', 'success');
+          loadPresets();
+        } else {
+          showToast('❌ Gagal menyimpan preset: ' + json.message, 'error');
+        }
+      } catch (e) {
+        showToast('Error: ' + e, 'error');
+      }
+    }
+
+    async function removePreset(token, name) {
+      if (!confirm('Hapus sudut pantau "' + name + '"?')) return;
+      try {
+        const res = await fetch('/api/camera/presets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'remove', token: token })
+        });
+        const json = await res.json();
+        if (json.success) {
+          showToast('🗑️ Sudut pantau "' + name + '" dihapus.', 'info');
+          loadPresets();
+        } else {
+          showToast('Gagal menghapus preset: ' + json.message, 'error');
+        }
+      } catch (e) {
+        showToast('Error: ' + e, 'error');
+      }
+    }
+
+    async function promptRebootCamera() {
+      const ok = confirm('⚠️ PERINGATAN REBOOT:\n\nSistem internal kamera Bardi akan di-restart. Kamera akan offline sekitar 30 - 45 detik lalu aktif kembali otomatis.\n\nApakah Anda yakin ingin me-reboot kamera sekarang?');
+      if (!ok) return;
+
+      showToast('⚡ Mengirim sinyal reboot ke kamera Bardi...', 'error');
+      try {
+        const res = await fetch('/api/camera/reboot', { method: 'POST' });
+        const json = await res.json();
+        if (json.success) {
+          showToast('✅ Kamera sedang reboot. Layar akan online kembali dalam 45s.', 'info');
+          setTimeout(() => reloadLiveFeed(), 40000);
+        } else {
+          showToast('Gagal reboot: ' + json.message, 'error');
+        }
+      } catch (e) {
+        showToast('Error reboot: ' + e, 'error');
+      }
     }
 
     async function testCameraConnection() {
@@ -2320,6 +3004,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       renderRulerAndGrid();
       loadDateTimeline();
+      loadCameraHardwareStatus();
     });
   </script>
 
