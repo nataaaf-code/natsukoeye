@@ -1,0 +1,26 @@
+services:
+  cctv-app:
+    build: .
+    container_name: cctv-app
+    expose:
+      - "5000"
+    volumes:
+      - /media/hdd/cctv_recordings:/recordings
+      - ./app:/app/app
+    environment:
+      - TZ=Asia/Jakarta
+      - FLASK_SECRET_KEY=cctv-bardi-production-secret-2024
+    restart: unless-stopped
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.cctv.rule=Host(`cctv.natsuko.ai.id`)"
+      - "traefik.http.routers.cctv.entrypoints=websecure"
+      - "traefik.http.routers.cctv.tls.certresolver=myresolver"
+      - "traefik.http.services.cctv.loadbalancer.server.port=5000"
+
+networks:
+  proxy:
+    external: true

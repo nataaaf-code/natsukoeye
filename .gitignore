@@ -1,0 +1,32 @@
+# CCTV Video Recordings
+recordings/
+/recordings/
+*.mp4
+*.mkv
+*.avi
+*.ts
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+
+# System logs & temporary files
+*.log
+/tmp/
+.DS_Store
+*.swp
+*.swo
+
+# Environment variables & local secrets
+.env
+.env.local
+config.yaml
+app/config.yaml
