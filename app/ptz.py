@@ -167,6 +167,26 @@ class BardiCameraControl:
         except Exception as e:
             return False, str(e)
 
+    def goto_home(self, profile="PROFILE_000"):
+        action = f'''<tptz:GotoHomePosition>
+          <tptz:ProfileToken>{profile}</tptz:ProfileToken>
+        </tptz:GotoHomePosition>'''
+        try:
+            self._send(self.ptz_url, action, timeout=12.0)
+            return True, "Kamera kembali ke posisi tengah (Home)"
+        except Exception as e:
+            return False, str(e)
+
+    def set_home(self, profile="PROFILE_000"):
+        action = f'''<tptz:SetHomePosition>
+          <tptz:ProfileToken>{profile}</tptz:ProfileToken>
+        </tptz:SetHomePosition>'''
+        try:
+            self._send(self.ptz_url, action, timeout=5.0)
+            return True, "Posisi tengah (Home) berhasil diperbarui ke posisi saat ini"
+        except Exception as e:
+            return False, str(e)
+
     # -------------------------------------------------------------------------
     # Imaging & Night Mode
     # -------------------------------------------------------------------------

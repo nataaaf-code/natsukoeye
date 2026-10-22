@@ -346,6 +346,8 @@ def api_devices_save():
             dev['password'] = existing.get('password', 'admin') if existing else 'admin'
         dev['rtsp_path'] = data.get('rtsp_path', '/V_ENC_000').strip() or '/V_ENC_000'
         dev['onvif_port'] = int(data.get('onvif_port', 10000) or 10000)
+        dev['tuya_id'] = data.get('tuya_id', '').strip()
+        dev['tuya_key'] = data.get('tuya_key', '').strip()
 
     idx = next((i for i, d in enumerate(devices) if d.get('id') == dev_id), -1)
     if idx >= 0:
@@ -642,6 +644,17 @@ def api_ptz_stop():
     ok, msg = ptz.stop()
     return jsonify({"success": ok, "message": msg})
 
+@app.route('/api/ptz/home', methods=['POST'])
+def api_ptz_home():
+    dev_id = request.args.get('device')
+    action = request.args.get('action', 'goto')
+    ptz = get_ptz(dev_id)
+    if action == 'set':
+        ok, msg = ptz.set_home()
+    else:
+        ok, msg = ptz.goto_home()
+    return jsonify({"success": ok, "message": msg})
+
 # ---------------------------------------------------------------------------
 # ONVIF Camera Control (Night Mode, Imaging, Siren/Relay, Presets, Reboot)
 # ---------------------------------------------------------------------------
@@ -681,17 +694,48 @@ def api_camera_siren():
         state = data.get('state', 'active').lower()
         duration = int(data.get('duration', 0))
 
+        # Check if Tuya Local credentials exist for this camera
+        dev = get_device_by_id(dev_id)
+        tuya_id = dev.get('tuya_id')
+        tuya_key = dev.get('tuya_key')
+        tuya_ok = False
+        tuya_msg = ""
+
+        if tuya_id and tuya_key:
+            try:
+                import tinytuya
+                d = tinytuya.Device(tuya_id, dev.get('ip', '192.168.1.3'), tuya_key, version=float(dev.get('tuya_ver', 3.3)))
+                d.set_socketPersistent(False)
+                d.set_status(state == 'active', 159)
+                tuya_ok = True
+                tuya_msg = f"Tuya hardware siren set to {state}"
+            except Exception as te:
+                tuya_msg = str(te)
+
+        # Also trigger ONVIF relay
         ok, msg = ptz.set_relay(logical_state=state)
-        if ok and state == 'active' and duration > 0:
+
+        if state == 'active' and duration > 0:
             def auto_off():
                 time.sleep(duration)
                 try:
                     ptz.set_relay(logical_state='inactive')
+                    if tuya_id and tuya_key:
+                        import tinytuya
+                        d = tinytuya.Device(tuya_id, dev.get('ip', '192.168.1.3'), tuya_key, version=float(dev.get('tuya_ver', 3.3)))
+                        d.set_socketPersistent(False)
+                        d.set_status(False, 159)
                 except Exception:
                     pass
             threading.Thread(target=auto_off, daemon=True).start()
 
-        return jsonify({"success": ok, "message": msg, "state": state})
+        return jsonify({
+            "success": True,
+            "message": "Sirine aktif (Web Audio + Hardware Trigger)",
+            "tuya_triggered": tuya_ok,
+            "tuya_msg": tuya_msg,
+            "state": state
+        })
     except Exception as e:
         app.logger.error(f"Error api_camera_siren: {e}")
         return jsonify({"success": False, "message": str(e), "state": "error"}), 500
@@ -778,6 +822,8 @@ def save_settings():
             dev['password'] = existing.get('password', 'admin') if existing else 'admin'
         dev['rtsp_path'] = request.form.get('rtsp_path', '/V_ENC_000').strip() or '/V_ENC_000'
         dev['onvif_port'] = int(request.form.get('onvif_port', 10000) or 10000)
+        dev['tuya_id'] = request.form.get('tuya_id', '').strip()
+        dev['tuya_key'] = request.form.get('tuya_key', '').strip()
 
     # Save to devices
     idx = next((i for i, d in enumerate(devices) if d.get('id') == dev_id), -1)

@@ -1770,7 +1770,7 @@
           <div class="ptz-pad">
             <button class="ptz-btn ptz-up" onmousedown="ptzMove('up')" onmouseup="ptzStop()" ontouchstart="ptzMove('up'); event.preventDefault();" ontouchend="ptzStop()" title="Tilt Up">▲</button>
             <button class="ptz-btn ptz-left" onmousedown="ptzMove('left')" onmouseup="ptzStop()" ontouchstart="ptzMove('left'); event.preventDefault();" ontouchend="ptzStop()" title="Pan Left">◀</button>
-            <button class="ptz-btn ptz-center" onclick="ptzStop()" ontouchstart="ptzStop()" title="Stop">■</button>
+            <button class="ptz-btn ptz-center" onclick="gotoHomePosition()" ontouchstart="gotoHomePosition(); event.preventDefault();" title="Kembali ke Titik Tengah (Home)">🏠</button>
             <button class="ptz-btn ptz-right" onmousedown="ptzMove('right')" onmouseup="ptzStop()" ontouchstart="ptzMove('right'); event.preventDefault();" ontouchend="ptzStop()" title="Pan Right">▶</button>
             <button class="ptz-btn ptz-down" onmousedown="ptzMove('down')" onmouseup="ptzStop()" ontouchstart="ptzMove('down'); event.preventDefault();" ontouchend="ptzStop()" title="Tilt Down">▼</button>
           </div>
@@ -1858,13 +1858,21 @@
           <!-- 5. Presets (Sudut Pantau Favorit) -->
           <div style="margin-top:0.9rem; padding-top:0.75rem; border-top:1.5px dashed #000000;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap; gap:0.4rem;">
-              <div class="unit-label" style="margin-bottom:0;">🎯 SUDUT PANTAU CEPAT (PTZ PRESETS)</div>
-              <button type="button" class="btn btn-accent" onclick="promptSavePreset()" style="font-size:0.7rem; padding:3px 8px; font-weight:800;">
-                + SIMPAN SUDUT SEKARANG
-              </button>
+              <div class="unit-label" style="margin-bottom:0;">🎯 SUDUT PANTAU (PRESETS &amp; HOME)</div>
+              <div style="display:flex; gap:0.4rem;">
+                <button type="button" class="btn btn-sm" onclick="gotoHomePosition()" style="font-size:0.7rem; padding:3px 8px; font-weight:800;" title="Putar kamera kembali ke posisi tengah awal">
+                  🏠 PUSAT (HOME)
+                </button>
+                <button type="button" class="btn btn-accent btn-sm" onclick="promptSavePreset()" style="font-size:0.7rem; padding:3px 8px; font-weight:800;">
+                  + SIMPAN SUDUT
+                </button>
+              </div>
             </div>
             <div class="preset-chips" id="presetChipsContainer">
               <span style="font-size:0.72rem; color:var(--text-muted); font-style:italic;">Memuat daftar sudut pantau...</span>
+            </div>
+            <div style="font-size:0.68rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace; margin-top:0.5rem; line-height:1.4;">
+              💡 <em>Kamera Bardi PTZ memiliki sensor referensi pusat: klik <strong>🏠 PUSAT</strong> untuk mengembalikan arah kamera langsung ke titik tengah terkalibrasi.</em>
             </div>
           </div>
         </div>
@@ -2278,6 +2286,17 @@
               <input type="number" name="onvif_port" id="modalDevOnvifPort" class="form-control" value="{{ active_dev.onvif_port or 10000 }}">
             </div>
           </div>
+
+          <div class="form-grid" style="margin-top:0.6rem; padding-top:0.6rem; border-top:1px dashed #000000;">
+            <div class="form-group">
+              <label>Tuya Device ID <span style="font-size:0.65rem; font-weight:normal; color:var(--text-muted);">(Opsional: Hardware Siren)</span></label>
+              <input type="text" name="tuya_id" id="modalDevTuyaId" class="form-control" value="{{ active_dev.tuya_id or '' }}" placeholder="bf123456789...">
+            </div>
+            <div class="form-group">
+              <label>Tuya Local Key <span style="font-size:0.65rem; font-weight:normal; color:var(--text-muted);">(16 Karakter Hex)</span></label>
+              <input type="password" name="tuya_key" id="modalDevTuyaKey" class="form-control" value="{{ active_dev.tuya_key or '' }}" placeholder="Contoh: 0123456789abcdef">
+            </div>
+          </div>
         </div>
 
         <!-- HLS Specific Fields Container -->
@@ -2449,6 +2468,8 @@
         document.getElementById('modalDevPass').value = '';
         document.getElementById('modalDevRtspPath').value = dev.rtsp_path || '/V_ENC_000';
         document.getElementById('modalDevOnvifPort').value = dev.onvif_port || 10000;
+        document.getElementById('modalDevTuyaId').value = dev.tuya_id || '';
+        document.getElementById('modalDevTuyaKey').value = dev.tuya_key || '';
       }
       onModalTypeChange();
 
@@ -2815,18 +2836,74 @@
       }
     }
 
+    // =========================================================================
+    // EMERGENCY SIREN (WEB AUDIO SYNTHESIZER & HARDWARE RELAY TRIGGER)
+    // =========================================================================
     let sirenTimeout = null;
+    let sirenAudioCtx = null;
+    let sirenOscillator = null;
+    let sirenGain = null;
+    let sirenInterval = null;
+
+    function startBrowserSiren() {
+      try {
+        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+        if (!sirenAudioCtx) sirenAudioCtx = new AudioCtxClass();
+        if (sirenAudioCtx.state === 'suspended') sirenAudioCtx.resume();
+
+        stopBrowserSiren();
+
+        sirenOscillator = sirenAudioCtx.createOscillator();
+        sirenGain = sirenAudioCtx.createGain();
+
+        sirenOscillator.type = 'sawtooth';
+        sirenOscillator.frequency.setValueAtTime(800, sirenAudioCtx.currentTime);
+
+        sirenGain.gain.setValueAtTime(0.25, sirenAudioCtx.currentTime);
+
+        sirenOscillator.connect(sirenGain);
+        sirenGain.connect(sirenAudioCtx.destination);
+        sirenOscillator.start();
+
+        let high = false;
+        sirenInterval = setInterval(() => {
+          if (!sirenOscillator || !sirenAudioCtx) return;
+          const targetFreq = high ? 750 : 1250;
+          sirenOscillator.frequency.exponentialRampToValueAtTime(targetFreq, sirenAudioCtx.currentTime + 0.38);
+          high = !high;
+        }, 420);
+      } catch (e) {
+        console.warn('Web Audio siren error:', e);
+      }
+    }
+
+    function stopBrowserSiren() {
+      if (sirenInterval) {
+        clearInterval(sirenInterval);
+        sirenInterval = null;
+      }
+      if (sirenOscillator) {
+        try {
+          sirenOscillator.stop();
+          sirenOscillator.disconnect();
+        } catch (_) {}
+        sirenOscillator = null;
+      }
+    }
+
     async function triggerSiren(durationSec = 5) {
       const btn = document.getElementById('btnSirenTrigger');
       const btnStop = document.getElementById('btnSirenStop');
       const lbl = document.getElementById('lblSirenStatus');
+
+      startBrowserSiren();
 
       if (btn) {
         btn.classList.add('pulsing');
         btn.innerText = '🚨 MEMBUNYIKAN SIRINE...';
       }
       if (btnStop) btnStop.style.display = 'block';
-      if (lbl) lbl.innerText = 'Status: RELAY AKTIF (Bunyi)';
+      if (lbl) lbl.innerText = 'Status: SIRINE AKTIF (Bunyi)';
 
       try {
         const res = await fetch('/api/camera/siren', {
@@ -2841,7 +2918,7 @@
           json = { success: res.ok, message: 'Status HTTP ' + res.status };
         }
         if (json.success) {
-          showToast('📢 Sirine / Relay hardware kamera aktif (' + durationSec + 's)', 'error');
+          showToast('📢 Sirine darurat aktif (' + durationSec + 's)', 'error');
           if (sirenTimeout) clearTimeout(sirenTimeout);
           sirenTimeout = setTimeout(() => {
             stopSirenVisual();
@@ -2858,6 +2935,7 @@
 
     async function stopSiren() {
       if (sirenTimeout) clearTimeout(sirenTimeout);
+      stopBrowserSiren();
       try {
         await fetch('/api/camera/siren', {
           method: 'POST',
@@ -2872,6 +2950,7 @@
     }
 
     function stopSirenVisual() {
+      stopBrowserSiren();
       const btn = document.getElementById('btnSirenTrigger');
       const btnStop = document.getElementById('btnSirenStop');
       const lbl = document.getElementById('lblSirenStatus');
@@ -2881,6 +2960,24 @@
       }
       if (btnStop) btnStop.style.display = 'none';
       if (lbl) lbl.innerText = 'Relay hardware siap';
+    }
+
+    // =========================================================================
+    // PTZ HOME / PUSAT POSITION CALIBRATION
+    // =========================================================================
+    async function gotoHomePosition() {
+      showToast('🏠 Memutar kamera kembali ke titik tengah (Home)...', 'info');
+      try {
+        const res = await fetch('/api/ptz/home?action=goto', { method: 'POST' });
+        const json = await res.json();
+        if (json.success) {
+          showToast('✅ Kamera telah kembali ke titik pusat (Home).', 'success');
+        } else {
+          showToast('Gagal kembali ke Home: ' + json.message, 'error');
+        }
+      } catch (e) {
+        showToast('Error Home: ' + e, 'error');
+      }
     }
 
     function openImageModal() {
