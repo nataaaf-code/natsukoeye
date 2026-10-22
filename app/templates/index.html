@@ -280,6 +280,7 @@
       grid-template-columns: 1.35fr 1fr;
       gap: 1.25rem;
       margin-top: 1.25rem;
+      align-items: start;
     }
     @media (max-width: 960px) {
       .dashboard-grid { grid-template-columns: 1fr; }
@@ -294,6 +295,29 @@
     }
     @media (max-width: 600px) {
       .monitor-card { padding: 0.85rem; }
+    }
+
+    /* Static Camera Card (Compact & Full-Width) */
+    .static-cam-card {
+      background: #fafafa;
+      border: 2px solid #000000;
+      border-radius: 6px;
+      box-shadow: 2px 2px 0px #000000;
+      padding: 0.95rem 1.1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .static-cam-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 0.45rem;
+      border-bottom: 1.5px dashed #000000;
+      flex-wrap: wrap;
+      gap: 0.4rem;
     }
 
     .card-header-bar {
@@ -1764,30 +1788,33 @@
         </div>
         {% else %}
         <!-- Public / Static Camera Info & Actions Deck -->
-        <div class="control-deck" style="margin-top: 1rem;">
-          <div style="padding: 1.15rem; background: #fafafa; border: 2px solid #000000; box-shadow: 2px 2px 0px #000000; border-radius: 6px; width: 100%;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; padding-bottom:0.5rem; border-bottom:1.5px dashed #000000;">
-              <div style="font-weight:800; font-size:0.82rem; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:0.4rem;">
-                <span>🌐</span> KAMERA PUBLIK STATIS (HLS / M3U8)
-              </div>
-              <span class="tech-tag" style="background:#000000; color:#ffffff;">STATIC FEED</span>
+        <div class="static-cam-card">
+          <div class="static-cam-header">
+            <div style="font-weight:800; font-size:0.82rem; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:0.4rem;">
+              <span>🌐</span> KAMERA PUBLIK STATIS (HLS / M3U8)
             </div>
-            <div style="font-size:0.75rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace; margin-bottom:0.9rem; line-height:1.5;">
-              Sumber stream publik online aktif. Kamera ini tidak memiliki motor PTZ ONVIF mekanis. Pengaturan rekam 24/7 otomatis ke HDD dapat dikelola di menu <strong>SETUP</strong> di atas.
-            </div>
-            <div class="monitor-actions">
-              <div class="action-row">
-                <button onclick="takeSnapshot()" class="btn btn-accent" style="flex:1;">📸 SNAPSHOT FRAME</button>
-                <button onclick="reloadLiveFeed()" class="btn" style="flex:1;">🔄 RECONNECT STREAM</button>
-              </div>
-              <div style="font-size:0.72rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace; margin-top:0.4rem;">
-                {% if active_dev.record %}
-                  🔒 Perekam 24/7 NatsukoEye aktif merekam kamera ini non-stop ke HDD.
-                {% else %}
-                  👁️ Kamera ini diatur hanya untuk Live View (tidak merekam ke HDD).
-                {% endif %}
-              </div>
-            </div>
+            <span class="tech-tag" style="background:#000000; color:#ffffff; font-size:0.68rem;">STATIC FEED</span>
+          </div>
+
+          <div style="font-size:0.75rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace; line-height:1.5;">
+            Feed video publik aktif tanpa motor ONVIF PTZ mekanis. Perekaman 24/7 otomatis ke HDD dapat dikelola di menu <strong>SETUP</strong> di atas.
+          </div>
+
+          <div style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap;">
+            <button onclick="takeSnapshot()" class="btn btn-accent" style="flex:1; min-width:140px; padding:0.55rem 0.65rem; font-size:0.75rem;">
+              📸 SNAPSHOT FRAME
+            </button>
+            <button onclick="reloadLiveFeed()" class="btn" style="flex:1; min-width:140px; padding:0.55rem 0.65rem; font-size:0.75rem;">
+              🔄 RECONNECT STREAM
+            </button>
+          </div>
+
+          <div style="font-size:0.72rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">
+            {% if active_dev.record %}
+              🔒 <strong>Status Rekam:</strong> Perekam 24/7 aktif menyimpan rekaman ke HDD.
+            {% else %}
+              👁️ <strong>Status Rekam:</strong> Mode Live View saja (tidak merekam ke HDD).
+            {% endif %}
           </div>
         </div>
         {% endif %}
