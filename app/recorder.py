@@ -78,34 +78,50 @@ class CameraRecorder:
         except Exception as e:
             return False, f"Error: {str(e)}"
 
+    def is_alive(self):
+        return self.thread is not None and self.thread.is_alive() and not self.stop_event.is_set()
+
     def start(self):
         with self.lock:
             if self.thread and self.thread.is_alive():
                 return True, "Recorder sudah berjalan."
             self.stop_event.clear()
-            self.thread = threading.Thread(target=self._run_loop, daemon=True)
+            self.thread = threading.Thread(target=self._run_loop, daemon=True, name="cctv_watchdog")
             self.thread.start()
             return True, "Recorder dimulai."
 
     def stop(self):
         with self.lock:
             self.stop_event.set()
-            if self.process:
+            proc = self.process
+            if proc:
                 try:
-                    self.process.terminate()
-                    self.process.wait(timeout=5)
+                    proc.terminate()
+                    proc.wait(timeout=3)
                 except Exception:
                     try:
-                        self.process.kill()
+                        proc.kill()
                     except Exception:
                         pass
                 self.process = None
+
+            if self.thread and self.thread.is_alive() and threading.current_thread() != self.thread:
+                try:
+                    self.thread.join(timeout=4)
+                except Exception:
+                    pass
+            self.thread = None
             self.status = "idle"
             self.start_time = None
             return True, "Recorder dihentikan."
 
+    def restart(self):
+        self.stop()
+        return self.start()
+
     def _run_loop(self):
         """Continuous Watchdog Loop: Guarantees 24/7 non-stop auto-recording."""
+        logger.info("Watchdog loop started.")
         while not self.stop_event.is_set():
             cfg = self.config_getter()
             cam_cfg = cfg.get("camera", {})
@@ -133,7 +149,7 @@ class CameraRecorder:
                 "ffmpeg",
                 "-y",
                 "-rtsp_transport", "tcp",
-                "-timeout", "5000000",          # 5s network timeout on stream drop
+                "-timeout", "10000000",         # 10s socket timeout
                 "-hide_banner",
                 "-loglevel", "warning",
                 "-avoid_negative_ts", "make_zero",
@@ -156,28 +172,34 @@ class CameraRecorder:
 
             self.status = "connecting"
             logger.info(f"Starting 24/7 NVR recording from {self.get_masked_url(cam_cfg)}")
+            proc = None
             try:
                 with open(self.log_file, "a") as log_f:
-                    self.process = subprocess.Popen(
+                    proc = subprocess.Popen(
                         cmd,
                         stdout=subprocess.DEVNULL,
                         stderr=log_f
                     )
+                    self.process = proc
                     self.status = "recording"
                     self.start_time = time.time()
                     self.last_error = ""
 
-                    while self.process.poll() is None:
-                        if self.stop_event.is_set():
-                            self.process.terminate()
-                            try:
-                                self.process.wait(timeout=5)
-                            except Exception:
-                                self.process.kill()
-                            break
+                    while not self.stop_event.is_set() and proc.poll() is None:
                         time.sleep(2)
 
-                    return_code = self.process.returncode
+                    if self.stop_event.is_set():
+                        proc.terminate()
+                        try:
+                            proc.wait(timeout=3)
+                        except Exception:
+                            try:
+                                proc.kill()
+                            except Exception:
+                                pass
+                        break
+
+                    return_code = proc.returncode
                     if return_code != 0 and not self.stop_event.is_set():
                         self.status = "error"
                         if os.path.exists(self.log_file):
@@ -191,6 +213,8 @@ class CameraRecorder:
                 self.status = "error"
                 self.last_error = str(e)
                 logger.error(f"Recorder exception: {e}")
+            finally:
+                self.process = None
 
             if not self.stop_event.is_set():
                 # Auto-heal: quick pause and reconnect immediately

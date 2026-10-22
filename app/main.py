@@ -163,6 +163,19 @@ def cleanup_old_recordings():
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(cleanup_old_recordings, 'cron', hour=2, minute=0, id='daily_cleanup')
+
+def recorder_watchdog():
+    try:
+        curr_cfg = load_config()
+        cam_cfg = curr_cfg.get('camera', {})
+        if cam_cfg.get('enabled', False):
+            if not recorder.is_alive():
+                app.logger.warning("Watchdog: Recorder thread is not alive! Reviving recorder...")
+                recorder.start()
+    except Exception as e:
+        app.logger.error(f"Watchdog error: {e}")
+
+scheduler.add_job(recorder_watchdog, 'interval', seconds=20, id='recorder_watchdog')
 scheduler.start()
 
 # ---------------------------------------------------------------------------
@@ -370,8 +383,7 @@ def save_settings():
     save_config(curr_cfg)
 
     # Immediately ensure recorder is running 24/7
-    recorder.stop()
-    recorder.start()
+    recorder.restart()
     flash(f'Pengaturan kamera "{cam["name"]}" berhasil disimpan. Perekam 24/7 aktif & merekam!', 'success')
 
     return redirect(url_for('index'))
