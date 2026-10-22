@@ -509,6 +509,74 @@ def live_mjpeg():
 
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+@app.route('/live/audio')
+@app.route('/live/audio.mp3')
+def live_audio():
+    """Real-time live audio streaming (transcoded to MP3 for universal browser support)."""
+    dev_id = request.args.get('device')
+    dev = get_device_by_id(dev_id)
+    dev_type = dev.get('type', 'rtsp').lower()
+
+    if dev_type == 'hls':
+        stream_url = dev.get('url', '')
+        cmd = [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel", "error",
+            "-i", stream_url,
+            "-vn",
+            "-c:a", "libmp3lame",
+            "-ar", "16000",
+            "-b:a", "32k",
+            "-f", "mp3",
+            "-"
+        ]
+    else:
+        ip = dev.get('ip', '192.168.1.3')
+        port = dev.get('port', 554)
+        user = dev.get('username', 'admin')
+        pwd = dev.get('password', 'admin')
+        stream_path = dev.get('rtsp_path', '/V_ENC_000') or '/V_ENC_000'
+        stream_url = f"rtsp://{user}:{pwd}@{ip}:{port}{stream_path}"
+        cmd = [
+            "ffmpeg",
+            "-rtsp_transport", "tcp",
+            "-timeout", "5000000",
+            "-fflags", "nobuffer",
+            "-flags", "low_delay",
+            "-hide_banner",
+            "-loglevel", "error",
+            "-i", stream_url,
+            "-vn",
+            "-c:a", "libmp3lame",
+            "-ar", "16000",
+            "-b:a", "32k",
+            "-f", "mp3",
+            "-"
+        ]
+
+    def generate_audio():
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=32768)
+        try:
+            while True:
+                chunk = proc.stdout.read(2048)
+                if not chunk:
+                    break
+                yield chunk
+        except GeneratorExit:
+            pass
+        finally:
+            proc.terminate()
+            try:
+                proc.wait(timeout=1)
+            except Exception:
+                proc.kill()
+
+    resp = Response(generate_audio(), mimetype='audio/mpeg')
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    return resp
+
 @app.route('/live/snapshot.jpg')
 def live_snapshot():
     """Capture a single instantaneous frame."""

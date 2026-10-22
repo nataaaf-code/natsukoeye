@@ -63,7 +63,8 @@ class BardiCameraControl:
     # PTZ Controls
     # -------------------------------------------------------------------------
     def move(self, direction="stop", speed=0.4, profile="PROFILE_000"):
-        x, y = 0.0, 0.0
+        x, y, z = 0.0, 0.0, 0.0
+        is_zoom = False
         if direction == "left":
             x = -speed
         elif direction == "right":
@@ -72,15 +73,29 @@ class BardiCameraControl:
             y = speed
         elif direction == "down":
             y = -speed
+        elif direction in ("zoomin", "zoom_in", "in"):
+            z = speed
+            is_zoom = True
+        elif direction in ("zoomout", "zoom_out", "out"):
+            z = -speed
+            is_zoom = True
         elif direction == "stop":
             return self.stop(profile)
 
-        action = f'''<tptz:ContinuousMove>
-          <tptz:ProfileToken>{profile}</tptz:ProfileToken>
-          <tptz:Velocity>
-            <tt:PanTilt x="{x}" y="{y}"/>
-          </tptz:Velocity>
-        </tptz:ContinuousMove>'''
+        if is_zoom:
+            action = f'''<tptz:ContinuousMove>
+              <tptz:ProfileToken>{profile}</tptz:ProfileToken>
+              <tptz:Velocity>
+                <tt:Zoom x="{z}"/>
+              </tptz:Velocity>
+            </tptz:ContinuousMove>'''
+        else:
+            action = f'''<tptz:ContinuousMove>
+              <tptz:ProfileToken>{profile}</tptz:ProfileToken>
+              <tptz:Velocity>
+                <tt:PanTilt x="{x}" y="{y}"/>
+              </tptz:Velocity>
+            </tptz:ContinuousMove>'''
         try:
             self._send(self.ptz_url, action, timeout=3.5)
             return True, f"Moving {direction}"

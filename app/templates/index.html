@@ -346,6 +346,61 @@
     }
     .live-stream-img {
       width: 100%; height: 100%; object-fit: cover; display: block;
+      transition: transform 0.08s ease-out;
+      transform-origin: center center;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    /* Floating Viewport Zoom Controls */
+    .viewport-zoom-overlay {
+      position: absolute;
+      right: 0.65rem;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.78);
+      backdrop-filter: blur(4px);
+      padding: 0.4rem 0.35rem;
+      border: 1.5px solid #ffffff;
+      border-radius: 6px;
+      box-shadow: 2px 2px 0px #000000;
+      z-index: 5;
+    }
+    .btn-zoom-vp {
+      background: #ffffff;
+      color: #000000;
+      border: 1.5px solid #000000;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+      transition: all 0.1s ease;
+    }
+    .btn-zoom-vp:hover {
+      background: var(--accent-yellow);
+      transform: scale(1.05);
+    }
+    .btn-zoom-vp:active {
+      transform: scale(0.95);
+    }
+    .zoom-vp-level {
+      color: #ffffff;
+      font-size: 0.65rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      text-align: center;
+      margin: 0.1rem 0;
+      user-select: none;
     }
     .viewport-overlay-top {
       position: absolute;
@@ -1644,7 +1699,10 @@
             <span>🔴 Live View & PTZ</span>
             <span style="font-size:0.72rem; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">[{{ active_dev.name }}]</span>
           </div>
-          <div style="display:flex; gap:0.35rem;">
+          <div style="display:flex; gap:0.35rem; align-items:center;">
+            {% if active_dev.type == 'rtsp' %}
+            <button id="btnAudioToggle" onclick="toggleLiveAudio()" class="btn btn-icon" title="Nyalakan / Matikan Suara Live">🔇</button>
+            {% endif %}
             <button onclick="takeSnapshot()" class="btn btn-icon" title="Ambil Foto">📸</button>
             <button onclick="toggleFullscreen()" class="btn btn-icon" title="Fullscreen">⛶</button>
             <button onclick="reloadLiveFeed()" class="btn btn-icon" title="Refresh Feed">🔄</button>
@@ -1674,11 +1732,25 @@
         <div class="video-viewport" id="viewportContainer">
           <img id="liveFeedImg" class="live-stream-img" src="/live/feed.mjpeg?device={{ active_device_id }}" alt="Memuat Live Stream CCTV..." onerror="handleFeedError(this)">
           <div class="viewport-overlay-top">
-            <div class="tech-tag" style="background:var(--accent-red);">
-              ● LIVE {% if active_dev.type == 'rtsp' %}2K SUPER HD{% else %}PUBLIC STREAM (HLS){% endif %}
+            <div style="display:flex; gap:0.4rem; align-items:center;">
+              <div class="tech-tag" style="background:var(--accent-red);">
+                ● LIVE {% if active_dev.type == 'rtsp' %}2K SUPER HD{% else %}PUBLIC STREAM (HLS){% endif %}
+              </div>
+              <div class="tech-tag" id="liveAudioBadge" style="background:var(--accent-green); color:#000000; font-weight:800; display:none;">
+                🔊 AUDIO AKTIF
+              </div>
             </div>
             <div class="tech-tag" id="liveTimestamp">--:--:-- WIB &middot; {{ active_dev.type|upper }}</div>
           </div>
+
+          <!-- Digital Viewport Zoom Controls (Floating Overlay) -->
+          <div class="viewport-zoom-overlay">
+            <button type="button" class="btn-zoom-vp" onclick="zoomViewport(0.25)" title="Zoom In (atau Scroll Roda Mouse)">🔍+</button>
+            <span class="zoom-vp-level" id="vpZoomLevel">1.0x</span>
+            <button type="button" class="btn-zoom-vp" onclick="zoomViewport(-0.25)" title="Zoom Out (atau Scroll Roda Mouse)">🔍−</button>
+            <button type="button" class="btn-zoom-vp" onclick="resetViewportZoom()" title="Reset Zoom (1.0x)">↺</button>
+          </div>
+
           <div class="viewport-overlay-bottom">
             <span class="tech-tag" style="background:var(--accent-yellow);">📍 {{ active_dev.name }}</span>
             {% if active_dev.record %}
@@ -1688,6 +1760,8 @@
             {% endif %}
           </div>
         </div>
+
+        <audio id="liveAudio" preload="none"></audio>
 
         {% if active_dev.has_ptz %}
         <!-- PTZ Controller & Actions -->
@@ -1703,6 +1777,14 @@
 
           <!-- Quick Action Buttons -->
           <div class="monitor-actions">
+            <div class="action-row" style="margin-bottom:0.5rem;">
+              <button class="btn" onmousedown="ptzMove('zoomin')" onmouseup="ptzStop()" ontouchstart="ptzMove('zoomin'); event.preventDefault();" ontouchend="ptzStop()" style="flex:1; font-size:0.75rem; padding:0.55rem 0.4rem; font-weight:800;" title="Hardware PTZ Zoom In">
+                🔎+ ZOOM IN
+              </button>
+              <button class="btn" onmousedown="ptzMove('zoomout')" onmouseup="ptzStop()" ontouchstart="ptzMove('zoomout'); event.preventDefault();" ontouchend="ptzStop()" style="flex:1; font-size:0.75rem; padding:0.55rem 0.4rem; font-weight:800;" title="Hardware PTZ Zoom Out">
+                🔎− ZOOM OUT
+              </button>
+            </div>
             <div class="action-row">
               <button onclick="takeSnapshot()" class="btn btn-accent" style="flex:1;">📸 SNAPSHOT 2K</button>
               <button onclick="testCameraConnection()" class="btn" id="btnTestConn" style="flex:1;">🔍 TEST PING</button>
@@ -2470,6 +2552,157 @@
         console.error('PTZ Stop failed', e);
       }
     }
+
+    // =========================================================================
+    // REAL-TIME AUDIO LISTENER
+    // =========================================================================
+    let isAudioPlaying = false;
+    function toggleLiveAudio() {
+      const audio = document.getElementById('liveAudio');
+      const btn = document.getElementById('btnAudioToggle');
+      const badge = document.getElementById('liveAudioBadge');
+      const devId = '{{ active_device_id }}';
+
+      if (!isAudioPlaying) {
+        audio.src = '/live/audio?device=' + devId + '&t=' + Date.now();
+        audio.play().then(() => {
+          isAudioPlaying = true;
+          if (btn) {
+            btn.innerHTML = '🔊';
+            btn.style.background = 'var(--accent-green)';
+            btn.style.color = '#000000';
+          }
+          if (badge) badge.style.display = 'block';
+          showToast('Suara mikrofon CCTV aktif', 'success');
+        }).catch((err) => {
+          console.warn('Audio play autoplay restriction:', err);
+          showToast('Klik sekali lagi untuk memutar suara (aturan browser)', 'warning');
+        });
+      } else {
+        audio.pause();
+        audio.src = '';
+        isAudioPlaying = false;
+        if (btn) {
+          btn.innerHTML = '🔇';
+          btn.style.background = '';
+          btn.style.color = '';
+        }
+        if (badge) badge.style.display = 'none';
+        showToast('Suara live dimatikan', 'info');
+      }
+    }
+
+    // =========================================================================
+    // HIGH-PRECISION DIGITAL VIEWPORT ZOOM & PAN (2K SENSOR)
+    // =========================================================================
+    let vpZoomScale = 1.0;
+    let vpPanX = 0;
+    let vpPanY = 0;
+    let isVpDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+
+    function updateViewportTransform() {
+      const img = document.getElementById('liveFeedImg');
+      const badge = document.getElementById('vpZoomLevel');
+      if (badge) badge.innerText = vpZoomScale.toFixed(1) + 'x';
+      if (!img) return;
+
+      if (vpZoomScale <= 1.0) {
+        vpZoomScale = 1.0;
+        vpPanX = 0;
+        vpPanY = 0;
+        img.style.transform = 'none';
+        img.style.cursor = 'default';
+      } else {
+        const maxPan = 40 * (vpZoomScale - 1);
+        vpPanX = Math.max(-maxPan, Math.min(maxPan, vpPanX));
+        vpPanY = Math.max(-maxPan, Math.min(maxPan, vpPanY));
+        img.style.transform = `scale(${vpZoomScale}) translate(${vpPanX}%, ${vpPanY}%)`;
+        img.style.cursor = isVpDragging ? 'grabbing' : 'grab';
+      }
+    }
+
+    function zoomViewport(delta) {
+      vpZoomScale = Math.max(1.0, Math.min(4.0, Math.round((vpZoomScale + delta) * 100) / 100));
+      updateViewportTransform();
+    }
+
+    function resetViewportZoom() {
+      vpZoomScale = 1.0;
+      vpPanX = 0;
+      vpPanY = 0;
+      updateViewportTransform();
+    }
+
+    // Attach Wheel & Drag to Viewport
+    document.addEventListener('DOMContentLoaded', () => {
+      const vp = document.getElementById('viewportContainer');
+      if (vp) {
+        vp.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          const delta = e.deltaY < 0 ? 0.25 : -0.25;
+          zoomViewport(delta);
+        }, { passive: false });
+
+        vp.addEventListener('mousedown', (e) => {
+          if (vpZoomScale > 1.0) {
+            isVpDragging = true;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            updateViewportTransform();
+          }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+          if (!isVpDragging) return;
+          const dx = e.clientX - dragStartX;
+          const dy = e.clientY - dragStartY;
+          dragStartX = e.clientX;
+          dragStartY = e.clientY;
+
+          const rect = vp.getBoundingClientRect();
+          vpPanX += (dx / rect.width) * (80 / vpZoomScale);
+          vpPanY += (dy / rect.height) * (80 / vpZoomScale);
+          updateViewportTransform();
+        });
+
+        window.addEventListener('mouseup', () => {
+          if (isVpDragging) {
+            isVpDragging = false;
+            updateViewportTransform();
+          }
+        });
+
+        // Touch Drag for Mobile
+        let touchX = 0, touchY = 0;
+        vp.addEventListener('touchstart', (e) => {
+          if (vpZoomScale > 1.0 && e.touches.length === 1) {
+            touchX = e.touches[0].clientX;
+            touchY = e.touches[0].clientY;
+            isVpDragging = true;
+          }
+        }, { passive: true });
+
+        vp.addEventListener('touchmove', (e) => {
+          if (isVpDragging && e.touches.length === 1) {
+            const dx = e.touches[0].clientX - touchX;
+            const dy = e.touches[0].clientY - touchY;
+            touchX = e.touches[0].clientX;
+            touchY = e.touches[0].clientY;
+
+            const rect = vp.getBoundingClientRect();
+            vpPanX += (dx / rect.width) * (80 / vpZoomScale);
+            vpPanY += (dy / rect.height) * (80 / vpZoomScale);
+            updateViewportTransform();
+          }
+        }, { passive: true });
+
+        vp.addEventListener('touchend', () => {
+          isVpDragging = false;
+        });
+      }
+    });
 
     function openSettingsModal() {
       document.getElementById('settingsModal').style.display = 'flex';
